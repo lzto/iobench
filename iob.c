@@ -48,7 +48,14 @@ void* producer(void* arg)
 		pthread_mutex_lock(&lock[p]);
 		bp[p] = BUFFER_SIZE;
 
-		buffer[p][0] = q;
+		int local_p;
+		buffer[p][0] = 1;
+		buffer[p][1] = 1;
+		for(local_p=2;local_p<BUFFER_SIZE;local_p++)
+		{
+			buffer[p][local_p] = buffer[p][local_p-1] + buffer[p][local_p-2];
+		}
+
 		pthread_mutex_unlock(&lock[p]);
 		//wait buffer empty
 		//printf("W(%d):%lu\n",p,q);
@@ -77,6 +84,12 @@ void* consumer()
 {
 	int i;
 	FILE * fp = fopen("./test.data","w");
+
+	static struct timeval time_r_start;
+	static struct timeval time_r_end;
+
+	gettimeofday(&time_r_start,NULL);
+
 	while(running)
 	{
 		for(i=0;i<NUM_OF_THREAD;i++)
@@ -85,17 +98,24 @@ void* consumer()
 			{
 				continue;
 			}
+
 			if(pthread_mutex_trylock(&lock[i])!=0)
 			{
 				continue;
 			}
+
 			fwrite(buffer[i],BUFFER_SIZE,1,fp);
 			//printf("-R(%d):%d\n", i, buffer[i][0]);
 			bp[i] = 0;
 			pthread_mutex_unlock(&lock[i]);
 		}
 	}
-	printf("Consumed\n");
+	gettimeofday(&time_r_end,NULL);
+
+	double sec = ((double)(time_r_end.tv_sec - time_r_start.tv_sec)+
+	 			 (time_r_end.tv_usec-time_r_start.tv_usec)/1000000.0);
+
+	printf("Consumed in %.2f sec\n", sec);
 	fclose(fp);
 	printf("Closed.\n");
 }
